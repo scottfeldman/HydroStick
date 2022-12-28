@@ -1,49 +1,192 @@
 package main
 
 import (
-	"fmt"
+	"errors"
+	"runtime"
+	"strconv"
 	"strings"
+	"time"
 
 	"tinygo.org/x/drivers/net"
 	"tinygo.org/x/drivers/net/tls"
 )
 
-type HttpClient struct {
+// -----------------------------------------------------------------------------
+
+type request struct {
+	https  bool
 	server string
-	conn   net.Conn
-	buf    [256]byte
+	bytes  []byte
+	body   string
+	close  bool
 }
 
-func (client *HttpClient) request(path string) (result []byte, err error) {
+type response struct {
+	bytes []byte
+	// code  int
+}
 
-	if client.conn != nil {
-		client.conn.Close()
+type HttpClient struct {
+	httpBuf     [4000]byte
+	connections map[string]net.Conn
+	timeout     time.Duration
+}
+
+// -----------------------------------------------------------------------------
+
+func NewGET(url string, headers map[string]string) request {
+	r := request{}
+	parts := strings.SplitN(url, "://", 2)
+	proto := parts[0]
+	parts = strings.SplitN(parts[1], "/", 2)
+	r.server = parts[0]
+	path := ""
+	if len(parts) > 1 {
+		path = parts[1]
 	}
+	r.https = (proto == "https")
+	r.bytes = []byte("GET /" + path + " HTTP/1.1\r\n" +
+		"Host: " + strings.Split(r.server, ":")[0] + "\r\n" +
+		"User-Agent: HydroStick\r\n" +
+		headersToString(headers),
+	)
+	return r
+}
 
-	println("\r\n---------------\r\nDialing TCP connection")
-	client.conn, err = tls.Dial("tcp", client.server, nil)
-	for ; err != nil; client.conn, err = tls.Dial("tcp", client.server, nil) {
-		return nil, err
+func NewPOST(url string, headers map[string]string) request {
+	r := request{}
+	parts := strings.SplitN(url, "://", 2)
+	proto := parts[0]
+	parts = strings.SplitN(parts[1], "/", 2)
+	r.server = parts[0]
+	path := ""
+	if len(parts) > 1 {
+		path = parts[1]
 	}
-	println("Connected!\r")
+	r.https = (proto == "https")
+	r.bytes = []byte("POST /" + path + " HTTP/1.1\r\n" +
+		"Host: " + strings.Split(r.server, ":")[0] + "\r\n" +
+		"User-Agent: VST Vibrator\r\n" +
+		"Content-Type: application/json\r\n" +
+		headersToString(headers),
+	)
+	return r
+}
 
-	print("Sending HTTPS request...")
-	fmt.Fprintln(client.conn, "GET ", path, " HTTP/1.1")
-	fmt.Fprintln(client.conn, "Host:", strings.Split(client.server, ":")[0])
-	fmt.Fprintln(client.conn, "User-Agent: TinyGo")
-	fmt.Fprintln(client.conn, "Connection: close")
-	fmt.Fprintln(client.conn)
-	println("Sent!\r\n\r")
+func headersToString(headers map[string]string) (result string) {
+	if headers == nil {
+		return
+	}
+	for name, value := range headers {
+		result += name + ": " + value + "\r\n"
+	}
+	return
+}
 
-	response := []byte{}
-	for n, err := client.conn.Read(client.buf[:]); n > 0; n, err = client.conn.Read(client.buf[:]) {
+// -----------------------------------------------------------------------------
+
+func (nina *HttpClient) sendHttp(req request, keepAlive bool) (resp response, err error) {
+	conn := nina.connections[req.server]
+	connNil := strconv.FormatBool(conn == nil)
+	ka := strconv.FormatBool(keepAlive)
+	defer un(trace("sendHttp " + connNil + ", " + ka))
+	if conn == nil {
+		conn, err = nina.dialHttp(req.https, req.server)
 		if err != nil {
-			return nil, err
-		} else {
-			response = append(response, client.buf[0:n]...)
+			trace("sendHttp->dialHttp " + err.Error())
+			return
 		}
+		nina.connections[req.server] = conn
 	}
 
-	return response, nil
+	request := []byte{}
+	request = append(request, req.bytes...)
+	if keepAlive {
+		request = append(request, []byte("Connection: keep-alive\r\n")...)
+	} else {
+		request = append(request, []byte("Connection: close\r\n")...)
+	}
+	if len(req.body) > 0 {
+		request = append(request, []byte("Content-Length: "+strconv.Itoa(len(req.body))+"\r\n\r\n")...)
+		request = append(request, []byte(req.body+"\r\n")...)
+		trace("POST " + req.body)
+	} else {
+		request = append(request, []byte("\r\n\r\n")...)
+		trace("GET")
+	}
 
+	println("Sending HTTP request...")
+	println(string(request))
+	println("---")
+
+	_, err = conn.Write(request)
+	if err != nil {
+		trace("sendHttp->Write " + err.Error())
+		conn.Close()
+		delete(nina.connections, req.server)
+		return
+	}
+	n, err := nina.readHttp(conn)
+	if err != nil {
+		trace("sendHttp->readHttp " + err.Error())
+		conn.Close()
+		delete(nina.connections, req.server)
+		return
+	}
+	resp.bytes = nina.httpBuf[:n]
+	// println(n)
+	trace(string(resp.bytes[:12]))
+	// println(string(resp.bytes))
+
+	if !keepAlive {
+		conn.Close()
+		delete(nina.connections, req.server)
+	}
+
+	return
+}
+
+func (nina *HttpClient) dialHttp(https bool, server string) (conn net.Conn, err error) {
+	trace(">dialHttp")
+	retries := 3
+	for {
+		if https {
+			conn, err = tls.Dial("tcp", server, nil)
+		} else {
+			conn, err = net.Dial("tcp", server)
+		}
+		if err == nil || retries == 0 {
+			trace("<dialHttp " + strconv.FormatBool(err == nil) + ", " + strconv.FormatBool(retries == 0))
+			return
+		}
+		// nina.wifi.device.Reset()
+		// if !nina.wifi.Connected() {
+		// trace("<dialHttp !connected")
+		// return
+		// }
+		time.Sleep(1 * time.Second)
+		retries--
+	}
+}
+
+func (nina *HttpClient) readHttp(conn net.Conn) (int, error) {
+	read := 0
+	timeout := time.Now().Add(nina.timeout)
+	for {
+		n, err := conn.Read(nina.httpBuf[read:])
+		if err != nil {
+			return 0, err
+		}
+		if n == 0 && (read != 0 || time.Now().After(timeout)) {
+			break
+		}
+		if n > 0 {
+			read += n
+		}
+		runtime.Gosched()
+	}
+	if time.Now().After(timeout) {
+		return 0, errors.New("Read timeout")
+	}
+	return read, nil
 }

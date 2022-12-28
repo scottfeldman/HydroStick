@@ -1,7 +1,7 @@
 package main
 
 const (
-	_trace   = true
+	_trace   = false
 	_verbose = false
 )
 

@@ -38,7 +38,7 @@ func configureWifinina() {
 
 func connectToAP(ssid, pass string) {
 	time.Sleep(2 * time.Second)
-	println("Connecting to " + ssid)
+	trace("Connecting to " + ssid)
 	err := adaptor.ConnectToAccessPoint(ssid, pass, 10*time.Second)
 	if err != nil {
 		for {
@@ -47,7 +47,7 @@ func connectToAP(ssid, pass string) {
 		}
 	}
 
-	println("Connected.")
+	trace("Connected.")
 
 	time.Sleep(2 * time.Second)
 	ip, _, _, err := adaptor.GetIP()
@@ -55,5 +55,5 @@ func connectToAP(ssid, pass string) {
 		println(err.Error())
 		time.Sleep(1 * time.Second)
 	}
-	println(ip.String())
+	trace(ip.String())
 }

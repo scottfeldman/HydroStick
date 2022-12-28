@@ -31,7 +31,7 @@ func (b *Blynk) updateInt(name string, value int) (err error) {
 	if err != nil {
 		return err
 	} else {
-		println(string(res.bytes))
+		trace(string(res.bytes))
 	}
 	return nil
 }
@@ -43,7 +43,7 @@ func (b *Blynk) event(name string) (err error) {
 	if err != nil {
 		return err
 	} else {
-		println(string(res.bytes))
+		trace(string(res.bytes))
 	}
 	return nil
 }

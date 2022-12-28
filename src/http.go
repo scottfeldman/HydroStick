@@ -115,9 +115,9 @@ func (nina *HttpClient) sendHttp(req request, keepAlive bool) (resp response, er
 		trace("GET")
 	}
 
-	println("Sending HTTP request...")
-	println(string(request))
-	println("---")
+	trace("Sending HTTP request...")
+	trace(string(request))
+	trace("---")
 
 	_, err = conn.Write(request)
 	if err != nil {

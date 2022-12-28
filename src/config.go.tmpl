@@ -1,0 +1,16 @@
+import "time"
+
+var (
+	// Debug & Calibrate
+	PrintRaw bool = false
+
+	// Wifi connectivity
+	WifiSsid = "WIFI ACCESS POINT NAME"
+	WifiPass = "WIFI ACCESS POINT PASSOWRD"
+
+	// Sensor & Blynk
+	SensorMin  float64       = 23000
+	SensorMax  float64       = 51000
+	ProbeFreq  time.Duration = 1 * time.Minute
+	BlynkToken = "BLYNK TOKEN"
+)

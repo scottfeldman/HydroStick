@@ -5,34 +5,41 @@ import (
 	"time"
 )
 
-const sensorMax = 500
-const sensorMin = 250
-const sensorMid = (sensorMax + sensorMin) / 2
-
 type Sensor struct {
-	adc       machine.ADC
-	lastValue float64
-	beta      float64
-	scale     float64
+	pin machine.ADC
+
+	beta  float64
+	times int
+	delay time.Duration
 }
 
-func (s *Sensor) read(times int, delay time.Duration) float64 {
+func NewSensor(pin machine.ADC) *Sensor {
+	return &Sensor{
+		pin:   pin,
+		beta:  0.05,
+		times: 100,
+		delay: 1 * time.Millisecond,
+	}
+}
 
-	if times == 0 {
-		times = 1
+func (s *Sensor) read() float64 {
+
+	if s.times == 0 {
+		s.times = 1
 	}
 
-	for i := 0; i < times; i++ {
-		raw := s.adc.Get()
-		if i == 0 {
-			s.lastValue = float64(raw)
-		} else {
-			s.lastValue = s.lastValue*(1-s.beta) + float64(raw)*s.beta
-		}
-		if delay != 0 {
-			time.Sleep(delay)
+	value := float64(s.pin.Get())
+	for i := 0; i < s.times; i++ {
+		raw := s.pin.Get()
+		value = value*(1-s.beta) + float64(raw)*s.beta
+		if s.delay != 0 {
+			time.Sleep(s.delay)
 		}
 	}
 
-	return s.lastValue * s.scale
+	return value
+}
+
+func toPercent(value, min, max float64) float64 {
+	return ((value - min) / (max - min)) * 100
 }

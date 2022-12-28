@@ -15,7 +15,7 @@ func main() {
 	machine.InitADC()
 	pin := machine.ADC{Pin: machine.A0}
 	pin.Configure(machine.ADCConfig{})
-	sensor := Sensor{beta: 0.05, lastValue: 0, adc: pin, scale: 0.01}
+	sensor := NewSensor(pin)
 
 	blynk := NewBlynk(BlynkToken)
 
@@ -23,18 +23,20 @@ func main() {
 	blynk.event("CONNECT")
 
 	for {
-		println("main: start ", time.Now().Unix())
-		value := sensor.read(100, 10*time.Millisecond)
-		println(int(value))
-		err := blynk.updateInt("v0", int(value))
-		println("main: err")
+		raw := sensor.read()
+		percent := 100 - toPercent(raw, SensorMin, SensorMax)
+		if PrintRaw {
+			println(raw)
+		} else {
+			println(percent)
+		}
+		err := blynk.updateInt("v0", int(percent))
 		if err != nil {
 			println(err.Error())
 			setupWifi(WifiSsid, WifiPass)
 			blynk.event("CONNECT")
 		}
 		led.Set(!led.Get())
-		println("main: end", time.Now().Unix())
-		time.Sleep(1 * time.Minute)
+		time.Sleep(ProbeFreq)
 	}
 }

@@ -6,7 +6,7 @@ TARGET ?= nano-rp2040
 
 # --- Common targets ---
 
-VERSION := $(shell git describe --tags)
+VERSION := $(shell git describe --tags --always)
 LD_FLAGS := -ldflags="-X 'main.Version=$(VERSION)'"
 
 clean:
@@ -14,7 +14,7 @@ clean:
 
 build:
 	@mkdir -p build
-	tinygo build $(LD_FLAGS) -target=$(TARGET) -size=$(SIZE) -opt=z -print-allocs=main -o ./build/debug.elf ./src
+	tinygo build $(LD_FLAGS) -target=$(TARGET) -size=$(SIZE) -opt=z -print-allocs=main -o ./build/debug.elf .
 
 flash:
-	tinygo flash $(LD_FLAGS) -target=$(TARGET) -size=$(SIZE) -opt=z -print-allocs=main ./src
+	tinygo flash $(LD_FLAGS) -target=$(TARGET) -size=$(SIZE) -opt=z -print-allocs=main .

@@ -4,6 +4,7 @@ import (
 	"machine"
 	"time"
 
+	"tinygo.org/x/drivers/net"
 	"tinygo.org/x/drivers/wifinina"
 )
 
@@ -30,6 +31,8 @@ func configureWifinina() {
 		machine.NINA_ACK,
 		machine.NINA_GPIO0,
 		machine.NINA_RESETN)
+
+	net.ActiveDevice = nil
 	adaptor.Configure()
 }
 

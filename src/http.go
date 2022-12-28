@@ -135,7 +135,7 @@ func (nina *HttpClient) sendHttp(req request, keepAlive bool) (resp response, er
 	}
 	resp.bytes = nina.httpBuf[:n]
 	// println(n)
-	trace(string(resp.bytes[:12]))
+	//trace(string(resp.bytes[:12]))
 	// println(string(resp.bytes))
 
 	if !keepAlive {
@@ -159,11 +159,6 @@ func (nina *HttpClient) dialHttp(https bool, server string) (conn net.Conn, err 
 			trace("<dialHttp " + strconv.FormatBool(err == nil) + ", " + strconv.FormatBool(retries == 0))
 			return
 		}
-		// nina.wifi.device.Reset()
-		// if !nina.wifi.Connected() {
-		// trace("<dialHttp !connected")
-		// return
-		// }
 		time.Sleep(1 * time.Second)
 		retries--
 	}

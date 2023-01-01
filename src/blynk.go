@@ -1,49 +1,50 @@
 package main
 
 import (
+	"bytes"
 	"strconv"
 	"time"
 
-	"tinygo.org/x/drivers/net"
+	"tinygo.org/x/drivers/net/http"
 )
 
 type Blynk struct {
 	server string
 	token  string
-	client HttpClient
+	client http.Client
+	traceBuf bytes.Buffer
 }
 
 func NewBlynk(token string) *Blynk {
 	return &Blynk{
 		server: "https://fra1.blynk.cloud",
 		token:  token,
-		client: HttpClient{
-			timeout:     time.Second,
-			connections: map[string]net.Conn{},
+		client: http.Client{
+			Timeout:     time.Second,
 		},
 	}
 }
 
 func (b *Blynk) updateInt(name string, value int) (err error) {
 	url := b.server + "/external/api/update?token=" + b.token + "&" + name + "=" + strconv.Itoa(value)
-	req := NewGET(url, nil)
-	res, err := b.client.sendHttp(req, false)
+	res, err := b.client.Get(url)
 	if err != nil {
 		return err
 	} else {
-		trace(string(res.bytes))
+		res.Write(&b.traceBuf)
+		trace(b.traceBuf.String())
 	}
 	return nil
 }
 
 func (b *Blynk) event(name string) (err error) {
 	url := b.server + "/external/api/logEvent?token=" + b.token + "&code=" + name
-	req := NewGET(url, nil)
-	res, err := b.client.sendHttp(req, false)
+	res, err := b.client.Get(url)
 	if err != nil {
 		return err
 	} else {
-		trace(string(res.bytes))
+		res.Write(&b.traceBuf)
+		trace(b.traceBuf.String())
 	}
 	return nil
 }

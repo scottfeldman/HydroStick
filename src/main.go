@@ -3,6 +3,8 @@ package main
 import (
 	"machine"
 	"time"
+
+	_ "tinygo.org/x/drivers/netdev"
 )
 
 var Version string
@@ -19,7 +21,6 @@ func main() {
 
 	blynk := NewBlynk(BlynkToken)
 
-	setupWifi(WifiSsid, WifiPass)
 	blynk.event("CONNECT")
 
 	for {
@@ -33,7 +34,6 @@ func main() {
 		err := blynk.updateInt("v0", int(percent))
 		if err != nil {
 			println(err.Error())
-			setupWifi(WifiSsid, WifiPass)
 			blynk.event("CONNECT")
 		}
 		led.Set(!led.Get())
